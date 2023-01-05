@@ -2,7 +2,7 @@
 description = "Resolve domain names and create nftables IP sets with the IPs."
 edition = "2021"
 name = "nftables-dns"
-version = "0.1.0"
+version = "0.1.1"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

@@ -46,18 +46,22 @@ fn write_nftables_set<W: Write, T: NfTablesSetItem>(
     elements: &[T],
 ) -> std::io::Result<()> {
     writer.write_fmt(format_args!(
-        "set {} {{\n    type {}\n    elements = {{\n",
+        "set {} {{\n    type {}\n",
         name,
         T::item_type()
     ))?;
-    for (i, item) in elements.iter().enumerate() {
-        writer.write_fmt(format_args!("        {}", item))?;
-        if i < elements.len() - 1 {
-            writer.write_all(b",")?;
+    if elements.len() > 0 {
+        writer.write(b"    elements = {\n")?;
+        for (i, item) in elements.iter().enumerate() {
+            writer.write_fmt(format_args!("        {}", item))?;
+            if i < elements.len() - 1 {
+                writer.write_all(b",")?;
+            }
+            writer.write_all(b"\n")?;
         }
-        writer.write_all(b"\n")?;
+        writer.write(b"    }\n")?;
     }
-    writer.write_all(b"    }\n}\n")?;
+    writer.write_all(b"}\n")?;
     Ok(())
 }
 
@@ -131,9 +135,11 @@ mod tests {
         env::temp_dir,
         fs::File,
         io::{BufReader, BufWriter, Read, Write},
+        net::{Ipv4Addr, Ipv6Addr},
+        vec,
     };
 
-    use crate::update_nftables_ip_sets;
+    use crate::{update_nftables_ip_sets, write_nftables_set};
 
     #[test]
     fn test_integration() {
@@ -167,6 +173,87 @@ set dns_ipv6 {
     elements = {
         ::1
     }
+}
+"
+        );
+    }
+
+    #[test]
+    fn test_write_nftables_set_ipv4_addr() {
+        let mut writer = BufWriter::new(Vec::new());
+        write_nftables_set(
+            &mut writer,
+            "test_set",
+            &vec![Ipv4Addr::new(127, 0, 0, 1), Ipv4Addr::new(127, 0, 0, 2)],
+        )
+        .unwrap();
+        let output = String::from_utf8(writer.into_inner().unwrap()).unwrap();
+        assert_eq!(
+            output,
+            "\
+set test_set {
+    type ipv4_addr
+    elements = {
+        127.0.0.1,
+        127.0.0.2
+    }
+}
+"
+        );
+    }
+
+    #[test]
+    fn test_write_nftables_set_ipv4_addr_empty() {
+        let mut writer = BufWriter::new(Vec::new());
+        write_nftables_set::<_, Ipv4Addr>(&mut writer, "test_set", &vec![]).unwrap();
+        let output = String::from_utf8(writer.into_inner().unwrap()).unwrap();
+        assert_eq!(
+            output,
+            "\
+set test_set {
+    type ipv4_addr
+}
+"
+        );
+    }
+
+    #[test]
+    fn test_write_nftables_set_ipv6_addr() {
+        let mut writer = BufWriter::new(Vec::new());
+        write_nftables_set(
+            &mut writer,
+            "test_set",
+            &vec![
+                Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
+                Ipv6Addr::new(1, 0, 0, 0, 0, 0, 0, 1),
+            ],
+        )
+        .unwrap();
+        let output = String::from_utf8(writer.into_inner().unwrap()).unwrap();
+        assert_eq!(
+            output,
+            "\
+set test_set {
+    type ipv6_addr
+    elements = {
+        ::1,
+        1::1
+    }
+}
+"
+        );
+    }
+
+    #[test]
+    fn test_write_nftables_set_ipv6_addr_empty() {
+        let mut writer = BufWriter::new(Vec::new());
+        write_nftables_set::<_, Ipv6Addr>(&mut writer, "test_set", &vec![]).unwrap();
+        let output = String::from_utf8(writer.into_inner().unwrap()).unwrap();
+        assert_eq!(
+            output,
+            "\
+set test_set {
+    type ipv6_addr
 }
 "
         );
